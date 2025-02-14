@@ -1,0 +1,62 @@
+services:
+  # Run as
+  # docker compose build; docker compose up -d
+  # Check with
+  # docker ps
+  # Then check the logs with
+  # docker logs --tail 50 $service_name
+  # docker-compose images
+  # docker-compose logs --tail 20 $service_name
+  # Connect to container
+  # docker compose exec $service_name bash
+
+  postgres:
+    container_name: pydb
+    image: postgres
+    restart: on-failure
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+    volumes:
+      - ./.docker/db:/docker-entrypoint-initdb.d
+      - ./.docker/init.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    networks:
+        - py-ntwk
+
+  admin:
+    depends_on:
+      - postgres
+    restart: always
+    container_name: pyadmin
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "8888:80"
+    volumes:
+      - ./.docker/volumes/pgadmin-data:/var/lib/pgadmin
+    networks:
+        - py-ntwk
+
+  python:
+    depends_on:
+      - postgres
+    container_name: pyapp
+    build:
+      context: .docker/
+      dockerfile: py.Dockerfile
+    volumes:
+      - .:/app
+    # env_file:
+    #   - ./app/local.env
+    command: # Keep container running
+      tail -f /dev/null
+    networks:
+        - py-ntwk
+
+networks:
+  py-ntwk:
+    driver: bridge
